@@ -159,12 +159,15 @@
     </div>
 
     <div v-if="showReports" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-40">
-        <div class="bg-white w-full max-w-6xl rounded-2xl shadow-2xl p-4 sm:p-6 max-h-[96vh] flex flex-col overflow-hidden">
+        <div class="bg-white w-full max-w-7xl rounded-2xl shadow-2xl p-4 sm:p-6 max-h-[96vh] flex flex-col overflow-hidden">
             
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-200 shrink-0">
                 <div class="flex flex-wrap items-center gap-1.5 order-2 md:order-1">
                     <button v-for="mode in ['Daily', 'Weekly', 'Monthly', 'Quarterly']" :key="mode" @click="changeReportMode(mode)" :class="reportMode === mode ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'" class="flex-1 sm:flex-none px-3 py-2 rounded-lg text-xs font-bold transition shadow-sm">
                         {{ mode }}
+                    </button>
+                    <button @click="wipeTransactionHistory" class="px-3 py-2 rounded-lg text-xs font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition shadow-sm flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i> Clear All Records
                     </button>
                 </div>
                 <div class="flex items-center justify-between md:justify-end gap-2 order-1 md:order-2 w-full md:w-auto">
@@ -176,48 +179,48 @@
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto mt-4 pr-1 no-scrollbar">
+            <div class="flex-1 overflow-y-auto mt-4 pr-1 no-scrollbar space-y-6">
                 <div id="visible-report-view" class="bg-white p-4 sm:p-6 md:p-8 rounded-xl border border-gray-100 text-gray-800 font-sans relative w-full overflow-x-auto lg:overflow-x-visible">
                     
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 border-b pb-4 min-w-[750px] lg:min-w-0">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 border-b pb-4 min-w-[950px] lg:min-w-0">
                         <div>
                             <h2 class="text-2xl sm:text-3xl font-black tracking-tight text-gray-900">{{ reportMode }} Sales Report</h2>
-                            <h4 class="text-xs font-bold tracking-widest text-emerald-600 uppercase mt-0.5">Enterprise CloudPOS Kiosk Summary</h4>
+                            <h4 class="text-xs font-bold tracking-widest text-emerald-600 uppercase mt-0.5">Quantity-Allocated Terminal Data Breakdown</h4>
                         </div>
                         <div class="text-left sm:text-right text-xs font-mono text-gray-400">
                             Generated: {{ new Date().toLocaleDateString() }}
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-6 min-w-[750px] lg:min-w-0">
+                    <div class="grid grid-cols-3 gap-6 min-w-[950px] lg:min-w-0">
                         <div class="col-span-2">
                             <table class="w-full text-left text-xs bg-white rounded-lg border border-gray-200 overflow-hidden">
                                 <thead>
                                     <tr class="bg-gray-800 text-white text-[11px] uppercase tracking-wider font-semibold">
                                         <th class="p-3 pl-4">Product Name</th>
-                                        <th class="p-3 text-right">{{ columnHeaders.c1 }}</th>
-                                        <th class="p-3 text-right">{{ columnHeaders.c2 }}</th>
-                                        <th class="p-3 text-right">{{ columnHeaders.c3 }}</th>
-                                        <th class="p-3 text-right">{{ columnHeaders.c4 }}</th>
-                                        <th class="p-3 pr-4 text-right">Total</th>
+                                        <th class="p-3 text-right">{{ columnHeaders.c1 }} (Qty)</th>
+                                        <th class="p-3 text-right">{{ columnHeaders.c2 }} (Qty)</th>
+                                        <th class="p-3 text-right">{{ columnHeaders.c3 }} (Qty)</th>
+                                        <th class="p-3 text-right">{{ columnHeaders.c4 }} (Qty)</th>
+                                        <th class="p-3 pr-4 text-right">Total Price</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 font-medium text-gray-600">
                                     <tr v-for="item in processedReportingMatrix" :key="item.name" class="hover:bg-gray-50/70 transition">
                                         <td class="p-3 pl-4 font-bold text-gray-900 bg-gray-50/40">{{ item.name }}</td>
-                                        <td class="p-3 text-right font-mono text-gray-500">${{ item.col1 === 0 ? '-' : item.col1.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
-                                        <td class="p-3 text-right font-mono text-gray-500">${{ item.col2 === 0 ? '-' : item.col2.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
-                                        <td class="p-3 text-right font-mono text-gray-500">${{ item.col3 === 0 ? '-' : item.col3.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
-                                        <td class="p-3 text-right font-mono text-gray-500">${{ item.col4 === 0 ? '-' : item.col4.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
-                                        <td class="p-3 pr-4 text-right font-mono font-bold text-gray-900 bg-gray-50/20">${{ item.total === 0 ? '-' : item.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
+                                        <td class="p-3 text-right font-mono text-gray-500">{{ item.col1 === 0 ? '-' : item.col1 }}</td>
+                                        <td class="p-3 text-right font-mono text-gray-500">{{ item.col2 === 0 ? '-' : item.col2 }}</td>
+                                        <td class="p-3 text-right font-mono text-gray-500">{{ item.col3 === 0 ? '-' : item.col3 }}</td>
+                                        <td class="p-3 text-right font-mono text-gray-500">{{ item.col4 === 0 ? '-' : item.col4 }}</td>
+                                        <td class="p-3 pr-4 text-right font-mono font-bold text-emerald-700 bg-gray-50/20">${{ item.totalPrice === 0 ? '-' : item.totalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
                         <div class="col-span-1 flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                            <div class="bg-gray-800 text-white px-4 py-3 text-xs font-bold uppercase tracking-wider text-center">Distribution</div>
-                            <div class="flex-1 p-4 flex flex-col justify-between min-h-[380px]">
+                            <div class="bg-gray-800 text-white px-4 py-3 text-xs font-bold uppercase tracking-wider text-center">Volume Metrics</div>
+                            <div class="flex-1 p-4 flex flex-col justify-between min-h-[320px]">
                                 <div class="relative w-full h-full flex-1">
                                     <canvas id="kioskChart"></canvas>
                                 </div>
@@ -225,6 +228,35 @@
                         </div>
                     </div>
 
+                </div>
+
+                <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-900 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-emerald-600"></i> Master Database Transaction History Log
+                    </h3>
+                    <div class="overflow-x-auto border rounded-lg bg-gray-50 max-h-60 overflow-y-auto no-scrollbar">
+                        <table class="w-full text-left text-xs text-gray-600 border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
+                                    <th class="p-3 pl-4">TX ID</th>
+                                    <th class="p-3">Timestamp / Date</th>
+                                    <th class="p-3 text-center">Items Purchased</th>
+                                    <th class="p-3 text-right pr-4">Total Amount Paid</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y bg-white">
+                                <tr v-if="reportOrders.length === 0">
+                                    <td colspan="4" class="p-6 text-center text-gray-400 font-medium font-sans">No transactions recorded in system database storage</td>
+                                </tr>
+                                <tr v-for="order in reportOrders" :key="order.id" class="hover:bg-gray-50/60 transition font-medium">
+                                    <td class="p-3 pl-4 font-mono font-bold text-gray-900">#{{ order.id }}</td>
+                                    <td class="p-3 font-mono text-gray-500">{{ new Date(order.timestamp).toLocaleString() }}</td>
+                                    <td class="p-3 text-center font-bold text-gray-700">{{ order.itemsCount }} units</td>
+                                    <td class="p-3 text-right pr-4 font-mono font-black text-emerald-600">${{ order.totalAmount.toFixed(2) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -235,11 +267,11 @@
             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; border-bottom: 3px solid #10B981; padding-bottom: 16px;">
                 <div>
                     <h2 style="font-size: 32px; font-weight: 900; color: #111827; margin: 0; tracking: -0.05em;">{{ reportMode }} Sales Report</h2>
-                    <h4 style="font-size: 11px; font-weight: 800; color: #047857; text-transform: uppercase; margin: 6px 0 0 0; letter-spacing: 0.15em;">Enterprise CloudPOS Kiosk Executive Ledger</h4>
+                    <h4 style="font-size: 11px; font-weight: 800; color: #047857; text-transform: uppercase; margin: 6px 0 0 0; letter-spacing: 0.15em;">Enterprise CloudPOS Kiosk Quantity Ledger</h4>
                 </div>
                 <div style="font-size: 12px; font-family: monospace; color: #6B7280; font-weight: 600; text-align: right;">
                     Generated: {{ new Date().toLocaleDateString() }}<br>
-                    Status: Verified Database Record
+                    Status: System Verified Data Record
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 700px 320px; gap: 40px; align-items: start;">
@@ -252,23 +284,23 @@
                                 <th style="padding: 14px 16px; text-align: right;">{{ columnHeaders.c2 }}</th>
                                 <th style="padding: 14px 16px; text-align: right;">{{ columnHeaders.c3 }}</th>
                                 <th style="padding: 14px 16px; text-align: right;">{{ columnHeaders.c4 }}</th>
-                                <th style="padding: 14px 16px; text-align: right;">Total</th>
+                                <th style="padding: 14px 16px; text-align: right;">Total Price</th>
                             </tr>
                         </thead>
                         <tbody style="color: #374151; font-weight: 600;">
                             <tr v-for="item in processedReportingMatrix" :key="item.name" style="border-bottom: 1px solid #E5E7EB;">
                                 <td style="padding: 14px 16px; font-weight: 800; color: #111827; background: #F9FAFB; font-size: 13px;">{{ item.name }}</td>
-                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">${{ item.col1 === 0 ? '0.00' : item.col1.toFixed(2) }}</td>
-                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">${{ item.col2 === 0 ? '0.00' : item.col2.toFixed(2) }}</td>
-                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">${{ item.col3 === 0 ? '0.00' : item.col3.toFixed(2) }}</td>
-                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">${{ item.col4 === 0 ? '0.00' : item.col4.toFixed(2) }}</td>
-                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; font-weight: 900; color: #111827; background: #F3F4F6; font-size: 14px;">${{ item.total === 0 ? '0.00' : item.total.toFixed(2) }}</td>
+                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">{{ item.col1 === 0 ? '-' : item.col1 }}</td>
+                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">{{ item.col2 === 0 ? '-' : item.col2 }}</td>
+                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">{{ item.col3 === 0 ? '-' : item.col3 }}</td>
+                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">{{ item.col4 === 0 ? '-' : item.col4 }}</td>
+                                <td style="padding: 14px 16px; text-align: right; font-family: monospace; font-weight: 900; color: #065F46; background: #E6F4EA; font-size: 14px;">${{ item.totalPrice === 0 ? '0.00' : item.totalPrice.toFixed(2) }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
                 <div style="border: 1px solid #E5E7EB; border-radius: 12px; background: white; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-                    <div style="background: #1F2937; color: white; padding: 14px; font-size: 11px; font-weight: 800; text-align: center; text-transform: uppercase; letter-spacing: 0.05em;">Visual Sales Allocation Matrix</div>
+                    <div style="background: #1F2937; color: white; padding: 14px; font-size: 11px; font-weight: 800; text-align: center; text-transform: uppercase; letter-spacing: 0.05em;">Unit Allocation Chart</div>
                     <div style="padding: 20px; height: 380px; position: relative; background: #FFFFFF;">
                         <canvas id="hiddenKioskChart"></canvas>
                     </div>
@@ -320,16 +352,16 @@
             const cartQuantity = computed(() => cart.value.reduce((sum, item) => sum + item.quantity, 0));
 
             const columnHeaders = computed(() => {
-                if (reportMode.value === 'Daily') return { c1: 'Morning (6-11)', c2: 'Midday (11-14)', c3: 'Afternoon (14-18)', c4: 'Evening (18-24)' };
-                if (reportMode.value === 'Weekly') return { c1: 'Week 1', c2: 'Week 2', c3: 'Week 3', c4: 'Week 4' };
-                if (reportMode.value === 'Monthly') return { c1: 'Jan - Mar', c2: 'Apr - Jun', c3: 'Jul - Sep', c4: 'Oct - Dec' };
-                return { c1: 'Qtr 1', c2: 'Qtr 2', c3: 'Qtr 3', c4: 'Qtr 4' };
+                if (reportMode.value === 'Daily') return { c1: 'Morning', c2: 'Midday', c3: 'Afternoon', c4: 'Evening' };
+                if (reportMode.value === 'Weekly') return { c1: 'Wk 1', c2: 'Wk 2', c3: 'Wk 3', c4: 'Wk 4' };
+                if (reportMode.value === 'Monthly') return { c1: 'Jan-Mar', c2: 'Apr-Jun', c3: 'Jul-Sep', c4: 'Oct-Dec' };
+                return { c1: 'Q1', c2: 'Q2', c3: 'Q3', c4: 'Q4' };
             });
 
             const processedReportingMatrix = computed(() => {
                 const matrixMap = {};
                 products.value.forEach(p => { 
-                    matrixMap[p.name] = { name: p.name, col1: 0, col2: 0, col3: 0, col4: 0, total: 0 }; 
+                    matrixMap[p.name] = { name: p.name, unitPrice: p.price, col1: 0, col2: 0, col3: 0, col4: 0, totalQty: 0, totalPrice: 0 }; 
                 });
 
                 reportOrders.value.forEach(order => {
@@ -358,14 +390,14 @@
 
                         order.itemsBreakdown.forEach(item => {
                             if (matrixMap[item.name]) {
-                                const sub = item.price * item.qty;
-                                matrixMap[item.name][targetBucket] += sub;
-                                matrixMap[item.name].total += sub;
+                                matrixMap[item.name][targetBucket] += item.qty;
+                                matrixMap[item.name].totalQty += item.qty;
+                                matrixMap[item.name].totalPrice = matrixMap[item.name].totalQty * matrixMap[item.name].unitPrice;
                             }
                         });
                     }
                 });
-                return Object.values(matrixMap).sort((a,b) => b.total - a.total);
+                return Object.values(matrixMap).sort((a,b) => b.totalQty - a.totalQty);
             });
 
             const addToCart = (product) => {
@@ -395,7 +427,7 @@
                 type: 'bar',
                 data: {
                     labels: processedReportingMatrix.value.map(x => x.name),
-                    datasets: [{ data: processedReportingMatrix.value.map(x => x.total), backgroundColor: '#10B981', borderRadius: 4 }]
+                    datasets: [{ data: processedReportingMatrix.value.map(x => x.totalQty), backgroundColor: '#10B981', borderRadius: 4 }]
                 },
                 options: { 
                     indexAxis: 'y',
@@ -427,9 +459,17 @@
                 nextTick(() => { renderCharts(); });
             };
 
+            // MASTER TRANSACTION CLEAR ACTION ENGINE
+            const wipeTransactionHistory = async () => {
+                if (confirm("Are you sure you want to permanently clear all historical transactions from the browser database? This action cannot be undone.")) {
+                    await db.orders.clear();
+                    reportOrders.value = [];
+                    nextTick(() => { renderCharts(); });
+                }
+            };
+
             const exportReportToPhoto = () => {
                 const targetNode = document.getElementById('hidden-desktop-canvas');
-                // Render at higher scale density to keep text from looking blurry on mobile screens
                 html2canvas(targetNode, { scale: 3, useCORS: true, backgroundColor: '#FFFFFF' }).then(canvas => {
                     const linkElement = document.createElement('a');
                     linkElement.download = `CloudPOS-${reportMode.value}Report.png`;
@@ -443,7 +483,6 @@
                 html2canvas(targetNode, { scale: 3, useCORS: true, backgroundColor: '#FFFFFF' }).then(canvas => {
                     const imgData = canvas.toDataURL('image/jpeg', 1.0);
                     const { jsPDF } = window.jspdf;
-                    // Creates an un-truncated landscape workspace document
                     const pdf = new jsPDF('l', 'mm', 'letter');
                     pdf.addImage(imgData, 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
                     pdf.save(`CloudPOS-${reportMode.value}Report.pdf`);
@@ -464,10 +503,10 @@
             return {
                 products, categories, activeCategory, filteredProducts, cart,
                 subtotal, tax, total, cartQuantity, showCheckoutModal, showAdmin, 
-                showReports, reportMode, columnHeaders, processedReportingMatrix, newProduct,
+                showReports, reportMode, columnHeaders, processedReportingMatrix, newProduct, reportOrders,
                 addToCart, increaseQty, decreaseQty, clearCart, processCheckout, 
                 printReceipt, closeModal, openReportsDashboard, changeReportMode,
-                addNewProduct, deleteProduct, exportReportToPhoto, exportReportToPDF
+                addNewProduct, deleteProduct, exportReportToPhoto, exportReportToPDF, wipeTransactionHistory
             };
         }
     }).mount('#app');
