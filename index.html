@@ -214,6 +214,11 @@
                                         <td class="p-3 text-right font-mono text-gray-500">{{ item.col4 === 0 ? '-' : item.col4 }}</td>
                                         <td class="p-3 pr-4 text-right font-mono font-bold text-emerald-700 bg-gray-50/20">${{ item.totalPrice === 0 ? '-' : item.totalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
                                     </tr>
+                                    <tr class="bg-emerald-50/60 font-black text-gray-900 border-t-2 border-gray-300">
+                                        <td class="p-3.5 pl-4 uppercase tracking-wider text-xs text-emerald-800">Overall Price</td>
+                                        <td colspan="4" class="p-3.5 text-right text-gray-400 font-normal italic font-sans">Accumulated Terminal Revenue Summary</td>
+                                        <td class="p-3.5 pr-4 text-right font-mono text-sm text-emerald-700">${{ overallReportPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -231,9 +236,10 @@
                 </div>
 
                 <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-200">
-                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-900 mb-3 flex items-center gap-2">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-gray-900 mb-1 flex items-center gap-2">
                         <i class="fa-solid fa-clock-rotate-left text-emerald-600"></i> Master Database Transaction History Log
                     </h3>
+                    <p class="text-xs text-gray-400 mb-3 font-medium">Click on any transaction record line below to audit itemized purchases.</p>
                     <div class="overflow-x-auto border rounded-lg bg-gray-50 max-h-60 overflow-y-auto no-scrollbar">
                         <table class="w-full text-left text-xs text-gray-600 border-collapse">
                             <thead>
@@ -248,16 +254,65 @@
                                 <tr v-if="reportOrders.length === 0">
                                     <td colspan="4" class="p-6 text-center text-gray-400 font-medium font-sans">No transactions recorded in system database storage</td>
                                 </tr>
-                                <tr v-for="order in reportOrders" :key="order.id" class="hover:bg-gray-50/60 transition font-medium">
-                                    <td class="p-3 pl-4 font-mono font-bold text-gray-900">#{{ order.id }}</td>
+                                <tr v-for="order in reportOrders" :key="order.id" @click="inspectedOrder = order" class="hover:bg-emerald-50/50 cursor-pointer transition font-medium group">
+                                    <td class="p-3 pl-4 font-mono font-bold text-gray-900 group-hover:text-emerald-700">#{{ order.id }}</td>
                                     <td class="p-3 font-mono text-gray-500">{{ new Date(order.timestamp).toLocaleString() }}</td>
                                     <td class="p-3 text-center font-bold text-gray-700">{{ order.itemsCount }} units</td>
-                                    <td class="p-3 text-right pr-4 font-mono font-black text-emerald-600">${{ order.totalAmount.toFixed(2) }}</td>
+                                    <td class="p-3 text-right pr-4 font-mono font-black text-emerald-600 flex items-center justify-end gap-2">
+                                        <span>${{ order.totalAmount.toFixed(2) }}</span>
+                                        <i class="fa-solid fa-chevron-right text-[10px] text-gray-300 group-hover:text-emerald-500 transition pl-1"></i>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="inspectedOrder" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-5 flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-center pb-2 border-b border-gray-100 mb-3">
+                <h3 class="text-sm font-black text-gray-800 tracking-wide uppercase flex items-center gap-1.5">
+                    <i class="fa-solid fa-magnifying-glass-chart text-emerald-600"></i> Audit Entry #{{ inspectedOrder.id }}
+                </h3>
+                <button @click="inspectedOrder = null" class="text-gray-400 hover:text-gray-600 text-xl font-medium">&times;</button>
+            </div>
+
+            <div id="inspection-print-area" class="flex-1 overflow-y-auto bg-gray-50 p-4 rounded-xl border font-mono text-xs text-gray-700 my-2">
+                <div class="text-center border-b border-dashed border-gray-300 pb-2 mb-3">
+                    <h4 class="font-bold text-gray-900">CLOUD POS TERMINAL</h4>
+                    <p class="text-[10px] text-gray-400 mt-0.5">HISTORICAL ARCHIVE LOG RECORD</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Date: {{ new Date(inspectedOrder.timestamp).toLocaleString() }}</p>
+                </div>
+                
+                <div class="space-y-2 border-b border-dashed border-gray-300 pb-3 mb-3">
+                    <div class="flex justify-between font-bold text-[10px] text-gray-400 uppercase tracking-wider">
+                        <span>Item Description</span>
+                        <span>Total Price</span>
+                    </div>
+                    <div v-for="item in inspectedOrder.itemsBreakdown" :key="item.name" class="flex justify-between items-start text-xs">
+                        <span class="text-gray-800 pr-4 font-semibold">{{ item.name }} <span class="text-gray-400 font-normal">x{{ item.qty }}</span></span>
+                        <span class="text-gray-900 font-bold">${{ (item.price * item.qty).toFixed(2) }}</span>
+                    </div>
+                </div>
+
+                <div class="space-y-1 text-right text-[11px] text-gray-500 font-medium">
+                    <div class="flex justify-between"><span>Subtotal:</span><span>${{ (inspectedOrder.totalAmount / 1.08).toFixed(2) }}</span></div>
+                    <div class="flex justify-between"><span>Tax (8%):</span><span>${{ (inspectedOrder.totalAmount - (inspectedOrder.totalAmount / 1.08)).toFixed(2) }}</span></div>
+                    <hr class="border-gray-200 my-1">
+                    <div class="flex justify-between font-black text-xs text-gray-900 mt-1">
+                        <span>Total Paid:</span>
+                        <span class="text-emerald-700">${{ inspectedOrder.totalAmount.toFixed(2) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button @click="inspectedOrder = null" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    Close Audit Window
+                </button>
             </div>
         </div>
     </div>
@@ -295,6 +350,11 @@
                                 <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">{{ item.col3 === 0 ? '-' : item.col3 }}</td>
                                 <td style="padding: 14px 16px; text-align: right; font-family: monospace; color: #4B5563;">{{ item.col4 === 0 ? '-' : item.col4 }}</td>
                                 <td style="padding: 14px 16px; text-align: right; font-family: monospace; font-weight: 900; color: #065F46; background: #E6F4EA; font-size: 14px;">${{ item.totalPrice === 0 ? '0.00' : item.totalPrice.toFixed(2) }}</td>
+                            </tr>
+                            <tr style="background-color: #ECFDF5; font-weight: 900; border-top: 2px solid #9CA3AF;">
+                                <td style="padding: 16px; text-transform: uppercase; color: #047857;">Overall Price</td>
+                                <td colspan="4" style="padding: 16px; text-align: right; color: #9CA3AF; font-weight: normal; font-style: italic;">Canvas Capture Gross Summary</td>
+                                <td style="padding: 16px; text-align: right; font-family: monospace; font-size: 16px; color: #04573E;">${{ overallReportPrice.toFixed(2) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -336,6 +396,7 @@
             const showReports = ref(false);
             const reportMode = ref('Quarterly'); 
             const reportOrders = ref([]);
+            const inspectedOrder = ref(null);
             const newProduct = ref({ name: '', price: null, category: 'Beverages', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' });
             
             let chartInstance = null;
@@ -400,6 +461,11 @@
                 return Object.values(matrixMap).sort((a,b) => b.totalQty - a.totalQty);
             });
 
+            // OVERALL PRICE COMPUTATION MATRIX VALUE ACCUMULATOR
+            const overallReportPrice = computed(() => {
+                return processedReportingMatrix.value.reduce((accum, item) => accum + item.totalPrice, 0);
+            });
+
             const addToCart = (product) => {
                 const existing = cart.value.find(item => item.product.id === product.id);
                 if (existing) { existing.quantity++; } 
@@ -459,11 +525,11 @@
                 nextTick(() => { renderCharts(); });
             };
 
-            // MASTER TRANSACTION CLEAR ACTION ENGINE
             const wipeTransactionHistory = async () => {
                 if (confirm("Are you sure you want to permanently clear all historical transactions from the browser database? This action cannot be undone.")) {
                     await db.orders.clear();
                     reportOrders.value = [];
+                    inspectedOrder.value = null;
                     nextTick(() => { renderCharts(); });
                 }
             };
@@ -503,7 +569,8 @@
             return {
                 products, categories, activeCategory, filteredProducts, cart,
                 subtotal, tax, total, cartQuantity, showCheckoutModal, showAdmin, 
-                showReports, reportMode, columnHeaders, processedReportingMatrix, newProduct, reportOrders,
+                showReports, reportMode, columnHeaders, processedReportingMatrix, overallReportPrice, newProduct, reportOrders,
+                inspectedOrder,
                 addToCart, increaseQty, decreaseQty, clearCart, processCheckout, 
                 printReceipt, closeModal, openReportsDashboard, changeReportMode,
                 addNewProduct, deleteProduct, exportReportToPhoto, exportReportToPDF, wipeTransactionHistory
