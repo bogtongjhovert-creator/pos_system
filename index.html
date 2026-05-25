@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise CloudPOS Kiosk + Analytics</title>
+    <title>Enterprise CloudPOS Kiosk + Per-Item Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
@@ -138,7 +138,7 @@
                     <select v-model="newProduct.category" class="p-2 border rounded-lg text-sm bg-white w-full">
                         <option v-for="cat in categories" :value="cat">{{ cat }}</option>
                     </select>
-                    <input v-model="newProduct.image" type="text" placeholder="Image URL (Unsplash/etc.)" class="p-2 border rounded-lg text-sm bg-white w-full">
+                    <input v-model="newProduct.image" type="text" placeholder="Image URL" class="p-2 border rounded-lg text-sm bg-white w-full">
                 </div>
                 <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg text-sm">Add Item</button>
             </form>
@@ -152,7 +152,7 @@
     </div>
 
     <div v-if="showReports" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-40">
-        <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-6 max-h-[94vh] flex flex-col overflow-y-auto no-scrollbar">
+        <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl p-6 max-h-[94vh] flex flex-col overflow-y-auto no-scrollbar">
             <div class="flex justify-between items-center pb-3 border-b">
                 <h3 class="text-2xl font-black text-gray-900 flex items-center gap-2">
                     <i class="fa-solid fa-chart-pie text-emerald-600"></i> Executive Reporting Engine
@@ -166,8 +166,28 @@
                 <button @click="changeReportFilter('monthly')" :class="reportRange === 'monthly' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'" class="py-2.5 rounded-xl font-bold transition text-sm">This Month</button>
             </div>
 
-            <div class="w-full bg-gray-50 border rounded-2xl p-4 mb-4 shadow-sm relative h-64">
-                <canvas id="kioskChart"></canvas>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-4">
+                <div class="lg:col-span-2 bg-gray-50 border rounded-2xl p-4 shadow-sm h-64 relative">
+                    <h5 class="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Sales Revenue Matrix</h5>
+                    <canvas id="kioskChart"></canvas>
+                </div>
+                
+                <div class="bg-gray-50 border rounded-2xl p-4 shadow-sm flex flex-col h-64">
+                    <h5 class="text-xs uppercase tracking-wider text-gray-400 font-bold mb-2">Itemized Product Sales</h5>
+                    <div class="flex-1 overflow-y-auto divide-y space-y-2 no-scrollbar">
+                        <div v-if="itemizedSales.length === 0" class="h-full flex flex-col items-center justify-center text-center text-gray-400 py-4">
+                            <i class="fa-solid fa-tags text-xl mb-1"></i>
+                            <p class="text-xs">No items sold.</p>
+                        </div>
+                        <div v-for="item in itemizedSales" :key="item.name" class="pt-2 flex justify-between items-center text-xs">
+                            <div class="truncate pr-2">
+                                <span class="font-bold text-gray-800 block truncate">{{ item.name }}</span>
+                                <span class="text-gray-400">Qty Sold: {{ item.qty }}</span>
+                            </div>
+                            <span class="font-black text-blue-600 shrink-0">${{ item.revenue.toFixed(2) }}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -186,7 +206,7 @@
             </div>
 
             <h4 class="font-bold text-sm text-gray-500 uppercase tracking-wider mb-2">Transaction History Log</h4>
-            <div class="border rounded-xl divide-y bg-gray-50 max-h-44 overflow-y-auto no-scrollbar">
+            <div class="border rounded-xl divide-y bg-gray-50 max-h-40 overflow-y-auto no-scrollbar">
                 <div v-if="reportOrders.length === 0" class="p-8 text-center text-gray-400">
                     <i class="fa-solid fa-folder-open text-2xl mb-1"></i>
                     <p class="text-sm">No sales data recorded in this range.</p>
@@ -205,7 +225,7 @@
 
             <div class="mt-4 pt-3 border-t flex justify-between items-center">
                 <button @click="injectMockData" class="text-xs font-semibold text-blue-500 hover:underline">
-                    <i class="fa-solid fa-flask"></i> Inject Extended Mock Sales History (Testing)
+                    <i class="fa-solid fa-flask"></i> Inject Extended Itemized Mock Sales History (Testing)
                 </button>
                 <span class="text-xs text-gray-400">Database Engine Status: Online</span>
             </div>
@@ -217,13 +237,12 @@
 <script>
     const { createApp, ref, computed, nextTick } = Vue;
 
-    // Database Setup
-    const db = new Dexie("KioskPOSDatabase");
+    // Upgraded Database Schema mapping structure to track separate item items inside the order array
+    const db = new Dexie("ItemizedKioskPOSDatabase");
     db.version(1).stores({ orders: '++id, timestamp, totalAmount, itemsCount' });
 
     createApp({
         setup() {
-            // Updated Products with Beautiful Unsplash Stock Images
             const products = ref([
                 { id: 1, name: 'Double Cheeseburger Deluxe', price: 5.99, category: 'Food', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=60' },
                 { id: 2, name: 'Crispy Sea-Salt Fries', price: 2.49, category: 'Food', image: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500&auto=format&fit=crop&q=60' },
@@ -243,7 +262,7 @@
             const reportOrders = ref([]);
             const newProduct = ref({ name: '', price: null, category: 'Food', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60' });
             
-            let chartInstance = null; // References the active ChartJS instance Object
+            let chartInstance = null;
 
             const filteredProducts = computed(() => {
                 if (activeCategory.value === 'All') return products.value;
@@ -261,6 +280,25 @@
                 return { count, gross, avg: count > 0 ? gross / count : 0 };
             });
 
+            // Processes historical metrics to calculate total quantity and revenue for every item purchased
+            const itemizedSales = computed(() => {
+                const map = {};
+                reportOrders.value.forEach(order => {
+                    // Safety validation if older schema items are found
+                    if (order.itemsBreakdown) {
+                        order.itemsBreakdown.forEach(item => {
+                            if (!map[item.name]) {
+                                map[item.name] = { name: item.name, qty: 0, revenue: 0 };
+                            }
+                            map[item.name].qty += item.qty;
+                            map[item.name].revenue += item.price * item.qty;
+                        });
+                    }
+                });
+                // Sort array output descending so top-selling items rank highest at the top
+                return Object.values(map).sort((a, b) => b.qty - a.qty);
+            });
+
             const addToCart = (product) => {
                 const existingItem = cart.value.find(item => item.product.id === product.id);
                 if (existingItem) { existingItem.quantity++; } 
@@ -274,18 +312,29 @@
             };
 
             const clearCart = () => cart.value = [];
+            
+            // Primary Action Execution - Saves order breakdown maps into Dexie 
             const processCheckout = async () => {
-                await db.orders.add({ timestamp: Date.now(), totalAmount: total.value, itemsCount: cartQuantity.value });
+                const breakdown = cart.value.map(item => ({
+                    name: item.product.name,
+                    price: item.product.price,
+                    qty: item.quantity
+                }));
+
+                await db.orders.add({ 
+                    timestamp: Date.now(), 
+                    totalAmount: total.value, 
+                    itemsCount: cartQuantity.value,
+                    itemsBreakdown: breakdown // Saving item lists inside transaction parameters
+                });
                 showCheckoutModal.value = true;
             };
+
             const printReceipt = () => window.print();
             const closeModal = () => { clearCart(); showCheckoutModal.value = false; };
 
-            // Render/Update the ChartJS Data Visualization
             const renderChart = () => {
                 const ctx = document.getElementById('kioskChart').getContext('2d');
-                
-                // Group transactions for mapping visual data coordinates
                 const groupedData = {};
                 
                 reportOrders.value.forEach(order => {
@@ -297,24 +346,23 @@
                     groupedData[label] = (groupedData[label] || 0) + order.totalAmount;
                 });
 
-                // Reverse sorting arrays so historical timelines go left-to-right correctly
                 const labels = Object.keys(groupedData).reverse();
                 const points = Object.values(groupedData).reverse();
 
-                if (chartInstance) { chartInstance.destroy(); } // Erase old cached memory graphics
+                if (chartInstance) { chartInstance.destroy(); }
 
                 chartInstance = new Chart(ctx, {
                     type: reportRange.value === 'daily' ? 'bar' : 'line',
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: 'Gross Sales Revenue ($)',
+                            label: 'Gross Revenue ($)',
                             data: points,
                             borderColor: '#059669',
                             backgroundColor: reportRange.value === 'daily' ? '#10B981' : 'rgba(16, 185, 129, 0.15)',
-                            borderWidth: 3,
+                            borderWidth: 2.5,
                             fill: true,
-                            tension: 0.3
+                            tension: 0.2
                         }]
                     },
                     options: {
@@ -337,27 +385,51 @@
                 const results = await db.orders.where('timestamp').aboveOrEqual(startTime).toArray();
                 reportOrders.value = results.sort((a,b) => b.timestamp - a.timestamp);
                 
-                // Wait for Vue DOM mapping to finalize before drawing canvas
                 nextTick(() => { renderChart(); });
             };
 
             const openReportsDashboard = () => { showReports.value = true; fetchReports(); };
             const changeReportFilter = (range) => { reportRange.value = range; fetchReports(); };
 
+            // Upgraded Test Mock data engine to inject randomized multi-item purchases
             const injectMockData = async () => {
                 const now = Date.now();
                 const hourInMs = 60 * 60 * 1000;
                 const dayInMs = 24 * hourInMs;
                 const mockBatch = [];
 
-                // Today's distribution hours
-                for (let i = 0; i < 5; i++) {
-                    mockBatch.push({ timestamp: now - (i * 2 * hourInMs), totalAmount: parseFloat((Math.random() * 20 + 5).toFixed(2)), itemsCount: Math.floor(Math.random() * 3) + 1 });
+                // Generate 25 historical itemized distribution purchases over past 30 days
+                for (let i = 0; i < 25; i++) {
+                    const daysAgo = Math.floor(Math.random() * 28);
+                    const timestamp = now - (daysAgo * dayInMs) - (Math.random() * hourInMs * 8);
+                    
+                    // Pick 1 to 3 random menu items for this mock purchase breakdown
+                    const itemCount = Math.floor(Math.random() * 3) + 1;
+                    const itemsBreakdown = [];
+                    let orderTotal = 0;
+                    let qtyTotal = 0;
+
+                    for(let j = 0; j < itemCount; j++) {
+                        const randomProduct = products.value[Math.floor(Math.random() * products.value.length)];
+                        const qty = Math.floor(Math.random() * 2) + 1;
+                        
+                        itemsBreakdown.push({
+                            name: randomProduct.name,
+                            price: randomProduct.price,
+                            qty: qty
+                        });
+                        orderTotal += randomProduct.price * qty;
+                        qtyTotal += qty;
+                    }
+
+                    mockBatch.push({
+                        timestamp,
+                        totalAmount: parseFloat((orderTotal * 1.08).toFixed(2)), // Including 8% tax calculation
+                        itemsCount: qtyTotal,
+                        itemsBreakdown
+                    });
                 }
-                // Monthly distribution historical spread
-                for (let i = 1; i < 20; i++) {
-                    mockBatch.push({ timestamp: now - (i * dayInMs) - (Math.random() * hourInMs * 6), totalAmount: parseFloat((Math.random() * 50 + 10).toFixed(2)), itemsCount: Math.floor(Math.random() * 4) + 1 });
-                }
+                
                 await db.orders.bulkAdd(mockBatch);
                 fetchReports();
             };
@@ -376,7 +448,7 @@
             return {
                 products, categories, activeCategory, filteredProducts, cart,
                 subtotal, tax, total, cartQuantity, showCheckoutModal, showAdmin, 
-                showReports, reportRange, reportOrders, reportMetrics, newProduct,
+                showReports, reportRange, reportOrders, reportMetrics, itemizedSales, newProduct,
                 addToCart, increaseQty, decreaseQty, clearCart, processCheckout, 
                 printReceipt, closeModal, openReportsDashboard, changeReportFilter, injectMockData,
                 addNewProduct, deleteProduct
