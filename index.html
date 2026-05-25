@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise CloudPOS Kiosk + Granular History</title>
+    <title>Enterprise CloudPOS Kiosk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -152,112 +154,126 @@
     </div>
 
     <div v-if="showReports" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-40">
-        <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl p-6 max-h-[94vh] flex flex-col overflow-y-auto no-scrollbar">
-            <div class="flex justify-between items-center pb-3 border-b">
+        <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl p-6 max-h-[94vh] flex flex-col overflow-y-auto no-scrollbar pb-4">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b gap-2">
                 <h3 class="text-2xl font-black text-gray-900 flex items-center gap-2">
                     <i class="fa-solid fa-chart-pie text-emerald-600"></i> Executive Reporting Engine
                 </h3>
-                <button @click="showReports = false" class="text-gray-400 hover:text-gray-600 text-3xl font-light">&times;</button>
-            </div>
-
-            <div class="grid grid-cols-3 gap-2 my-4">
-                <button @click="changeReportFilter('daily')" :class="reportRange === 'daily' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'" class="py-2.5 rounded-xl font-bold transition text-sm">Today</button>
-                <button @click="changeReportFilter('weekly')" :class="reportRange === 'weekly' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'" class="py-2.5 rounded-xl font-bold transition text-sm">This Week</button>
-                <button @click="changeReportFilter('monthly')" :class="reportRange === 'monthly' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'" class="py-2.5 rounded-xl font-bold transition text-sm">This Month</button>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-4">
-                <div class="lg:col-span-2 bg-gray-50 border rounded-2xl p-4 shadow-sm h-64 relative">
-                    <h5 class="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Sales Revenue Matrix</h5>
-                    <canvas id="kioskChart"></canvas>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button @click="exportReportToPhoto" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-camera"></i> Save to Photo
+                    </button>
+                    <button @click="exportReportToPDF" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-pdf"></i> Download PDF
+                    </button>
+                    <button @click="showReports = false" class="text-gray-400 hover:text-gray-600 text-3xl font-light px-2">&times;</button>
                 </div>
-                
-                <div class="bg-gray-50 border rounded-2xl p-4 shadow-sm flex flex-col h-64">
-                    <h5 class="text-xs uppercase tracking-wider text-gray-400 font-bold mb-2">Itemized Product Sales</h5>
-                    <div class="flex-1 overflow-y-auto divide-y space-y-2 no-scrollbar">
-                        <div v-if="itemizedSales.length === 0" class="h-full flex flex-col items-center justify-center text-center text-gray-400 py-4">
-                            <i class="fa-solid fa-tags text-xl mb-1"></i>
-                            <p class="text-xs">No items sold.</p>
-                        </div>
-                        <div v-for="item in itemizedSales" :key="item.name" class="pt-2 flex justify-between items-center text-xs">
-                            <div class="truncate pr-2">
-                                <span class="font-bold text-gray-800 block truncate">{{ item.name }}</span>
-                                <span class="text-gray-400">Qty Sold: {{ item.qty }}</span>
+            </div>
+
+            <div id="capture-report-node" class="bg-white p-2 rounded-xl mt-2 space-y-4">
+                <div class="grid grid-cols-3 gap-2 data-html2canvas-ignore-selectors">
+                    <button @click="changeReportFilter('daily')" :class="reportRange === 'daily' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'" class="py-2.5 rounded-xl font-bold transition text-sm">Today's Chart</button>
+                    <button @click="changeReportFilter('weekly')" :class="reportRange === 'weekly' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'" class="py-2.5 rounded-xl font-bold transition text-sm">Weekly Chart</button>
+                    <button @click="changeReportFilter('monthly')" :class="reportRange === 'monthly' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700'" class="py-2.5 rounded-xl font-bold transition text-sm">Monthly Chart</button>
+                </div>
+
+                <div class="hidden show-on-photo-capture border-l-4 border-emerald-600 bg-emerald-50 p-3 rounded-r-xl flex justify-between items-center">
+                    <div>
+                        <span class="text-xs uppercase tracking-wider text-emerald-700 font-bold block">Generated Report Export Snapshot</span>
+                        <h4 class="text-base font-black text-gray-800 capitalize">Chart Matrix Range: {{ reportRange }}</h4>
+                    </div>
+                    <span class="text-xs text-gray-400 font-mono font-medium">Timestamp: {{ new Date().toLocaleString() }}</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div class="lg:col-span-2 bg-gray-50 border rounded-2xl p-4 shadow-sm h-64 relative">
+                        <h5 class="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Sales Revenue Matrix</h5>
+                        <canvas id="kioskChart"></canvas>
+                    </div>
+                    
+                    <div class="bg-gray-50 border rounded-2xl p-4 shadow-sm flex flex-col h-64">
+                        <h5 class="text-xs uppercase tracking-wider text-gray-400 font-bold mb-2">Itemized Product Sales (Filtered)</h5>
+                        <div class="flex-1 overflow-y-auto divide-y space-y-2 no-scrollbar">
+                            <div v-if="itemizedSales.length === 0" class="h-full flex flex-col items-center justify-center text-center text-gray-400 py-4">
+                                <i class="fa-solid fa-tags text-xl mb-1"></i>
+                                <p class="text-xs">No items sold.</p>
                             </div>
-                            <span class="font-black text-blue-600 shrink-0">${{ item.revenue.toFixed(2) }}</span>
+                            <div v-for="item in itemizedSales" :key="item.name" class="pt-2 flex justify-between items-center text-xs">
+                                <div class="truncate pr-2">
+                                    <span class="font-bold text-gray-800 block truncate">{{ item.name }}</span>
+                                    <span class="text-gray-400">Qty Sold: {{ item.qty }}</span>
+                                </div>
+                                <span class="font-black text-blue-600 shrink-0">${{ item.revenue.toFixed(2) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-gray-50 p-4 border rounded-2xl">
+                        <span class="text-xs uppercase tracking-wider text-gray-400 font-bold">Filtered Gross Sales</span>
+                        <h4 class="text-2xl font-black text-gray-800">${{ reportMetrics.gross.toFixed(2) }}</h4>
+                    </div>
+                    <div class="bg-gray-50 p-4 border rounded-2xl">
+                        <span class="text-xs uppercase tracking-wider text-gray-400 font-bold">Orders Processed</span>
+                        <h4 class="text-2xl font-black text-gray-800">{{ reportMetrics.count }}</h4>
+                    </div>
+                    <div class="bg-gray-50 p-4 border rounded-2xl">
+                        <span class="text-xs uppercase tracking-wider text-gray-400 font-bold">Avg. Ticket Size</span>
+                        <h4 class="text-2xl font-black text-gray-800">${{ reportMetrics.avg.toFixed(2) }}</h4>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-sm text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-blue-600"></i> Master Transaction Audit Log 
+                            <span class="text-xs text-gray-400 normal-case font-semibold">({{ totalHistoricalOrdersCount }} Total Database Records)</span>
+                        </h4>
+                        <span class="text-[10px] bg-blue-100 text-blue-700 font-bold uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">Unfiltered History View</span>
+                    </div>
+                    <div class="border rounded-xl divide-y bg-gray-50 max-h-64 overflow-y-auto no-scrollbar shadow-inner">
+                        <div v-if="allHistoricalOrders.length === 0" class="p-8 text-center text-gray-400">
+                            <i class="fa-solid fa-folder-open text-2xl mb-1"></i>
+                            <p class="text-sm">No transaction records found inside local browser storage database.</p>
+                        </div>
+                        <div v-for="order in allHistoricalOrders" :key="order.id" class="flex flex-col transition">
+                            <div @click="toggleOrderDetails(order.id)" class="p-3.5 flex justify-between items-center text-xs cursor-pointer hover:bg-white active:bg-gray-100 transition select-none">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-gray-400 text-sm data-html2canvas-ignore">
+                                        <i :class="expandedOrderId === order.id ? 'fa-solid fa-chevron-down text-blue-600' : 'fa-solid fa-chevron-right'"></i>
+                                    </span>
+                                    <div>
+                                        <span class="font-bold text-gray-800 text-sm">Order #{{ order.id }}</span>
+                                        <span class="text-gray-400 block mt-0.5"><i class="fa-regular fa-clock mr-1"></i>{{ new Date(order.timestamp).toLocaleString() }}</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="font-black text-emerald-600 text-sm block">${{ order.totalAmount.toFixed(2) }}</span>
+                                    <span class="text-gray-500 font-medium">{{ order.itemsCount }} items</span>
+                                </div>
+                            </div>
+
+                            <div v-if="expandedOrderId === order.id" class="bg-gray-100 px-10 py-3 border-t border-b border-gray-200/60 divide-y divide-gray-200/40">
+                                <div v-for="item in order.itemsBreakdown" :key="item.name" class="py-2 flex justify-between items-center text-xs font-medium text-gray-700">
+                                    <span class="truncate pr-4 text-gray-900 font-semibold"><i class="fa-solid fa-caret-right text-gray-400 mr-1.5"></i>{{ item.name }}</span>
+                                    <div class="grid grid-cols-2 gap-8 w-32 text-right font-mono text-gray-600 shrink-0">
+                                        <span>x{{ item.qty }}</span>
+                                        <span class="font-bold text-gray-800">${{ (item.price * item.qty).toFixed(2) }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                <div class="bg-gray-50 p-4 border rounded-2xl">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-bold">Gross Sales</span>
-                    <h4 class="text-2xl font-black text-gray-800">${{ reportMetrics.gross.toFixed(2) }}</h4>
-                </div>
-                <div class="bg-gray-50 p-4 border rounded-2xl">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-bold">Orders Processed</span>
-                    <h4 class="text-2xl font-black text-gray-800">{{ reportMetrics.count }}</h4>
-                </div>
-                <div class="bg-gray-50 p-4 border rounded-2xl">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-bold">Avg. Ticket Size</span>
-                    <h4 class="text-2xl font-black text-gray-800">${{ reportMetrics.avg.toFixed(2) }}</h4>
-                </div>
-            </div>
-
-            <h4 class="font-bold text-sm text-gray-500 uppercase tracking-wider mb-2">Transaction History Log <span class="text-xs text-gray-400 normal-case font-medium">(Click an order row to view items)</span></h4>
-            <div class="border rounded-xl divide-y bg-gray-50 max-h-64 overflow-y-auto no-scrollbar shadow-inner">
-                <div v-if="reportOrders.length === 0" class="p-8 text-center text-gray-400">
-                    <i class="fa-solid fa-folder-open text-2xl mb-1"></i>
-                    <p class="text-sm">No sales data recorded in this range.</p>
-                </div>
-                <div v-for="order in reportOrders" :key="order.id" class="flex flex-col transition">
-                    <div @click="toggleOrderDetails(order.id)" class="p-3.5 flex justify-between items-center text-xs cursor-pointer hover:bg-white active:bg-gray-100 transition select-none">
-                        <div class="flex items-center gap-3">
-                            <span class="text-gray-400 text-sm">
-                                <i :class="expandedOrderId === order.id ? 'fa-solid fa-chevron-down text-blue-600' : 'fa-solid fa-chevron-right'"></i>
-                            </span>
-                            <div>
-                                <span class="font-bold text-gray-800 text-sm">Order #{{ order.id }}</span>
-                                <span class="text-gray-400 block mt-0.5"><i class="fa-regular fa-clock mr-1"></i>{{ new Date(order.timestamp).toLocaleString() }}</span>
-                            </div>
-                        </div>
-                        <div class="text-right flex items-center gap-4">
-                            <div>
-                                <span class="font-black text-emerald-600 text-sm block">${{ order.totalAmount.toFixed(2) }}</span>
-                                <span class="text-gray-500 font-medium">{{ order.itemsCount }} items</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="expandedOrderId === order.id" class="bg-gray-100 px-10 py-3 border-t border-b border-gray-200/60 divide-y divide-gray-200/40">
-                        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider pb-1.5 flex justify-between">
-                            <span>Purchased Product Name</span>
-                            <div class="grid grid-cols-2 gap-8 w-32 text-right">
-                                <span>Qty</span>
-                                <span>Sub</span>
-                            </div>
-                        </div>
-                        <div v-for="item in order.itemsBreakdown" :key="item.name" class="py-2 flex justify-between items-center text-xs font-medium text-gray-700">
-                            <span class="truncate pr-4 text-gray-900 font-semibold"><i class="fa-solid fa-caret-right text-gray-400 mr-1.5"></i>{{ item.name }}</span>
-                            <div class="grid grid-cols-2 gap-8 w-32 text-right font-mono text-gray-600 shrink-0">
-                                <span>x{{ item.qty }}</span>
-                                <span class="font-bold text-gray-800">${{ (item.price * item.qty).toFixed(2) }}</span>
-                            </div>
-                        </div>
-                        <div class="pt-1.5 text-[10px] text-gray-400 text-right font-medium">
-                            Base Ticket Subtotal (Excl. Tax Summary Metrics)
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-4 pt-3 border-t flex justify-between items-center">
-                <button @click="injectMockData" class="text-xs font-semibold text-blue-500 hover:underline">
-                    <i class="fa-solid fa-flask"></i> Inject Granular Itemized Mock Sales History (Testing)
-                </button>
-                <span class="text-xs text-gray-400">Database Engine Status: Online</span>
-            </div>
+            <style>
+                .show-on-photo-capture { display: none !important; }
+                .html2canvas-container-active .show-on-photo-capture { display: flex !important; }
+                .html2canvas-container-active .data-html2canvas-ignore-selectors { display: none !important; }
+            </style>
         </div>
     </div>
 
@@ -266,7 +282,6 @@
 <script>
     const { createApp, ref, computed, nextTick } = Vue;
 
-    // Upgraded Database Store definition mapping 
     const db = new Dexie("ItemizedKioskPOSDatabase");
     db.version(1).stores({ orders: '++id, timestamp, totalAmount, itemsCount' });
 
@@ -290,9 +305,10 @@
             const reportRange = ref('daily');
             const reportOrders = ref([]);
             
-            // NEW STATE TRACKER: Keeps track of which specific transaction ID detail view drawer is currently expanded
-            const expandedOrderId = ref(null);
+            const allHistoricalOrders = ref([]);
+            const totalHistoricalOrdersCount = computed(() => allHistoricalOrders.value.length);
 
+            const expandedOrderId = ref(null);
             const newProduct = ref({ name: '', price: null, category: 'Food', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60' });
             
             let chartInstance = null;
@@ -327,6 +343,77 @@
                 return Object.values(map).sort((a, b) => b.qty - a.qty);
             });
 
+            // COMPONENT 1: PHOTO EXPORT ENGINE
+            const exportReportToPhoto = () => {
+                const targetNode = document.getElementById('capture-report-node');
+                document.body.classList.add('html2canvas-container-active');
+
+                html2canvas(targetNode, {
+                    scale: 2,
+                    useCORS: true, 
+                    backgroundColor: '#ffffff',
+                    logging: false
+                }).then(canvas => {
+                    const photoDataUrl = canvas.toDataURL('image/png');
+                    const linkElement = document.createElement('a');
+                    const formattedDate = new Date().toISOString().split('T')[0];
+                    linkElement.download = `POS-Snapshot-${formattedDate}.png`;
+                    linkElement.href = photoDataUrl;
+                    linkElement.click();
+                    document.body.classList.remove('html2canvas-container-active');
+                }).catch(err => {
+                    console.error("Photo compilation engine failure:", err);
+                    document.body.classList.remove('html2canvas-container-active');
+                });
+            };
+
+            // NEW COMPONENT 2: VECTOR PDF EXPORT ENGINE
+            const exportReportToPDF = () => {
+                const targetNode = document.getElementById('capture-report-node');
+                document.body.classList.add('html2canvas-container-active');
+
+                // Render high-definition workspace canvas snapshot framework
+                html2canvas(targetNode, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    
+                    // Access jsPDF module through window global namespace context
+                    const { jsPDF } = window.jspdf;
+                    
+                    // Initialize letter orientation document specifications
+                    const pdf = new jsPDF('p', 'mm', 'letter');
+                    const imgWidth = 215.9; // Match exact width constraints of letter document (8.5 inches)
+                    const pageHeight = 279.4; // Height boundary constraints of Letter standard format (11 inches)
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    let heightLeft = imgHeight;
+                    let position = 0;
+
+                    // Add content array structures to page instances safely
+                    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+
+                    // Multi-page layout parsing engine loop fallback safety check
+                    while (heightLeft >= 0) {
+                        position = heightLeft - imgHeight;
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                    }
+
+                    const formattedDate = new Date().toISOString().split('T')[0];
+                    pdf.save(`ExecutivePOS-Report-${formattedDate}.pdf`);
+                    
+                    document.body.classList.remove('html2canvas-container-active');
+                }).catch(err => {
+                    console.error("PDF compiling matrix failure:", err);
+                    document.body.classList.remove('html2canvas-container-active');
+                });
+            };
+
             const addToCart = (product) => {
                 const existingItem = cart.value.find(item => item.product.id === product.id);
                 if (existingItem) { existingItem.quantity++; } 
@@ -360,12 +447,11 @@
             const printReceipt = () => window.print();
             const closeModal = () => { clearCart(); showCheckoutModal.value = false; };
 
-            // Toggle logic for opening or closing a transaction itemization panel row
             const toggleOrderDetails = (orderId) => {
                 if (expandedOrderId.value === orderId) {
-                    expandedOrderId.value = null; // Close drawer if clicked a second time
+                    expandedOrderId.value = null;
                 } else {
-                    expandedOrderId.value = orderId; // Expand clicked target drawer
+                    expandedOrderId.value = orderId;
                 }
             };
 
@@ -404,6 +490,7 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: { duration: 0 },
                         plugins: { legend: { display: false } },
                         scales: { y: { beginAtZero: true } }
                     }
@@ -421,54 +508,15 @@
                 const results = await db.orders.where('timestamp').aboveOrEqual(startTime).toArray();
                 reportOrders.value = results.sort((a,b) => b.timestamp - a.timestamp);
                 
-                // Clear any expanded panel state caching across tab switching
+                const totalHistory = await db.orders.toArray();
+                allHistoricalOrders.value = totalHistory.sort((a,b) => b.timestamp - a.timestamp);
+
                 expandedOrderId.value = null;
-                
                 nextTick(() => { renderChart(); });
             };
 
             const openReportsDashboard = () => { showReports.value = true; fetchReports(); };
             const changeReportFilter = (range) => { reportRange.value = range; fetchReports(); };
-
-            const injectMockData = async () => {
-                const now = Date.now();
-                const hourInMs = 60 * 60 * 1000;
-                const dayInMs = 24 * hourInMs;
-                const mockBatch = [];
-
-                for (let i = 0; i < 25; i++) {
-                    const daysAgo = Math.floor(Math.random() * 28);
-                    const timestamp = now - (daysAgo * dayInMs) - (Math.random() * hourInMs * 8);
-                    
-                    const itemCount = Math.floor(Math.random() * 3) + 1;
-                    const itemsBreakdown = [];
-                    let orderTotal = 0;
-                    let qtyTotal = 0;
-
-                    for(let j = 0; j < itemCount; j++) {
-                        const randomProduct = products.value[Math.floor(Math.random() * products.value.length)];
-                        const qty = Math.floor(Math.random() * 2) + 1;
-                        
-                        itemsBreakdown.push({
-                            name: randomProduct.name,
-                            price: randomProduct.price,
-                            qty: qty
-                        });
-                        orderTotal += randomProduct.price * qty;
-                        qtyTotal += qty;
-                    }
-
-                    mockBatch.push({
-                        timestamp,
-                        totalAmount: parseFloat((orderTotal * 1.08).toFixed(2)),
-                        itemsCount: qtyTotal,
-                        itemsBreakdown
-                    });
-                }
-                
-                await db.orders.bulkAdd(mockBatch);
-                fetchReports();
-            };
 
             const addNewProduct = () => {
                 const id = products.value.length ? Math.max(...products.value.map(p => p.id)) + 1 : 1;
@@ -485,10 +533,12 @@
                 products, categories, activeCategory, filteredProducts, cart,
                 subtotal, tax, total, cartQuantity, showCheckoutModal, showAdmin, 
                 showReports, reportRange, reportOrders, reportMetrics, itemizedSales, 
-                expandedOrderId, newProduct, // Exporting structural reactive states
+                allHistoricalOrders, totalHistoricalOrdersCount, expandedOrderId, newProduct,
                 addToCart, increaseQty, decreaseQty, clearCart, processCheckout, 
                 printReceipt, closeModal, openReportsDashboard, changeReportFilter, 
-                toggleOrderDetails, injectMockData, addNewProduct, deleteProduct
+                toggleOrderDetails, addNewProduct, deleteProduct, 
+                exportReportToPhoto, 
+                exportReportToPDF // Exporting new PDF action system model
             };
         }
     }).mount('#app');
